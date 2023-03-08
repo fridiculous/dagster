@@ -912,6 +912,7 @@ class ExternalResourceData(
             ("config_field_snaps", List[ConfigFieldSnap]),
             ("config_schema_snap", ConfigSchemaSnapshot),
             ("nested_resources", Dict[str, str]),
+            ("resource_type", str),
             ("is_top_level", bool),
         ],
     )
@@ -929,6 +930,7 @@ class ExternalResourceData(
         config_field_snaps: Sequence[ConfigFieldSnap],
         config_schema_snap: ConfigSchemaSnapshot,
         nested_resources: Mapping[str, str],
+        resource_type: str,
         is_top_level: bool = True,
     ):
         return super(ExternalResourceData, cls).__new__(
@@ -955,6 +957,7 @@ class ExternalResourceData(
                 check.opt_mapping_param(nested_resources, "nested_resources", key_type=str)
             ),
             is_top_level=check.bool_param(is_top_level, "is_top_level"),
+            resource_type=check.str_param(resource_type, "resource_type"),
         )
 
 
@@ -1410,6 +1413,7 @@ def external_resource_data_from_def(
         config_schema_snap=config_type.get_schema_snapshot(),
         nested_resources=nested_resources,
         is_top_level=is_top_level,
+        resource_type=str(type(resource_def))[8:-2],
     )
 
 
