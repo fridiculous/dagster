@@ -283,7 +283,7 @@ class CeleryK8sRunLauncher(RunLauncher, ConfigurableClass):
 
         return True
 
-    def terminate(self, run_id):
+    def terminate(self, run_id, message=None):
         check.str_param(run_id, "run_id")
 
         run = self._instance.get_run_by_id(run_id)
@@ -305,7 +305,7 @@ class CeleryK8sRunLauncher(RunLauncher, ConfigurableClass):
 
         job_namespace = self.get_namespace_from_run_config(run_id)
 
-        self._instance.report_run_canceling(run)
+        self._instance.report_run_canceling(run, message=message)
 
         try:
             termination_result = self._api_client.delete_job(

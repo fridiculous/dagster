@@ -159,7 +159,7 @@ class DefaultRunLauncher(RunLauncher, ConfigurableClass):
             use_ssl=bool(grpc_info.get("use_ssl", False)),
         )
 
-    def terminate(self, run_id):
+    def terminate(self, run_id, message=None):
         # defer for perf
         from dagster._grpc.types import CancelExecutionRequest, CancelExecutionResult
 
@@ -181,7 +181,7 @@ class DefaultRunLauncher(RunLauncher, ConfigurableClass):
             )
             return False
 
-        self._instance.report_run_canceling(run)
+        self._instance.report_run_canceling(run, message=message)
         res = deserialize_value(
             client.cancel_execution(CancelExecutionRequest(run_id=run_id)), CancelExecutionResult
         )
