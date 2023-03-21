@@ -5,6 +5,7 @@ from typing_extensions import Self
 
 import dagster._check as check
 from dagster._config.config_schema import UserConfigSchema
+from dagster._core.events import CancellationReason
 from dagster._core.storage.pipeline_run import DagsterRun, DagsterRunStatus
 from dagster._serdes import ConfigurableClass, ConfigurableClassData
 
@@ -49,5 +50,5 @@ class DefaultRunCoordinator(RunCoordinator, ConfigurableClass):
             check.failed(f"Failed to reload run {pipeline_run.run_id}")
         return run
 
-    def cancel_run(self, run_id: str) -> None:
+    def cancel_run(self, run_id: str, cancellation_reason: CancellationReason) -> bool:
         return self._instance.run_launcher.terminate(run_id)  # type: ignore
