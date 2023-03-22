@@ -6,6 +6,7 @@ export type ResourceDetailsFragment = {
   __typename: 'ResourceDetails';
   name: string;
   description: string | null;
+  supportsVerification: boolean;
   resourceType: string;
   configFields: Array<{
     __typename: 'ConfigTypeField';
@@ -44,6 +45,11 @@ export type ResourceDetailsFragment = {
   }>;
   assetKeysUsing: Array<{__typename: 'AssetKey'; path: Array<string>}>;
   jobsOpsUsing: Array<{__typename: 'JobWithOps'; jobName: string; ops: Array<string>}>;
+  verificationResult: {
+    __typename: 'ResourceVerificationResult';
+    status: Types.VerificationStatus;
+    message: string;
+  } | null;
 };
 
 export type ResourceRootQueryVariables = Types.Exact<{
@@ -67,6 +73,7 @@ export type ResourceRootQuery = {
         __typename: 'ResourceDetails';
         name: string;
         description: string | null;
+        supportsVerification: boolean;
         resourceType: string;
         configFields: Array<{
           __typename: 'ConfigTypeField';
@@ -105,6 +112,35 @@ export type ResourceRootQuery = {
         }>;
         assetKeysUsing: Array<{__typename: 'AssetKey'; path: Array<string>}>;
         jobsOpsUsing: Array<{__typename: 'JobWithOps'; jobName: string; ops: Array<string>}>;
+        verificationResult: {
+          __typename: 'ResourceVerificationResult';
+          status: Types.VerificationStatus;
+          message: string;
+        } | null;
       }
     | {__typename: 'ResourceNotFoundError'};
+};
+
+export type VerificationMutationVariables = Types.Exact<{
+  repositoryName: Types.Scalars['String'];
+  repositoryLocationName: Types.Scalars['String'];
+  resourceName: Types.Scalars['String'];
+}>;
+
+export type VerificationMutation = {
+  __typename: 'DagitMutation';
+  launchResourceVerification:
+    | {
+        __typename: 'PythonError';
+        message: string;
+        stack: Array<string>;
+        errorChain: Array<{
+          __typename: 'ErrorChainLink';
+          isExplicitLink: boolean;
+          error: {__typename: 'PythonError'; message: string; stack: Array<string>};
+        }>;
+      }
+    | {__typename: 'RepositoryLocationNotFound'}
+    | {__typename: 'ResourceVerificationResult'; status: Types.VerificationStatus; message: string}
+    | {__typename: 'UnauthorizedError'};
 };
