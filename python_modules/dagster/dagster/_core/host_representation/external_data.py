@@ -38,6 +38,7 @@ from dagster._config.structured_config import (
     PartialResource,
     ResourceWithKeyMapping,
 )
+from dagster._config.structured_config.resource_verification import ConfigVerifiable
 from dagster._core.definitions import (
     JobDefinition,
     PartitionsDefinition,
@@ -936,6 +937,7 @@ class ExternalResourceData(
             ("is_top_level", bool),
             ("asset_keys_using", List[AssetKey]),
             ("job_ops_using", Dict[str, List[str]]),
+            ("capabilities", List[str]),
         ],
     )
 ):
@@ -957,6 +959,7 @@ class ExternalResourceData(
         is_top_level: bool = True,
         asset_keys_using: Optional[Sequence[AssetKey]] = None,
         job_ops_using: Optional[Mapping[str, List[str]]] = None,
+        capabilities: Optional[Sequence[str]] = None,
     ):
         return super(ExternalResourceData, cls).__new__(
             cls,
@@ -1000,6 +1003,8 @@ class ExternalResourceData(
                 )
             )
             or {},
+            capabilities=list(check.opt_sequence_param(capabilities, "capabilities", of_type=str))
+            or [],
         )
 
 
@@ -1518,8 +1523,10 @@ def external_resource_data_from_def(
     }
 
     resource_type_def = resource_def
+    can_verify = isinstance(resource_def, ConfigVerifiable)
     if isinstance(resource_type_def, ResourceWithKeyMapping):
         resource_type_def = resource_type_def.wrapped_resource
+        can_verify = isinstance(resource_def.wrapped_resource, ConfigVerifiable)
     resource_type = str(type(resource_type_def))[8:-2]
 
     return ExternalResourceData(
@@ -1534,6 +1541,7 @@ def external_resource_data_from_def(
         asset_keys_using=resource_asset_usage_map.get(name, []),
         job_ops_using=resource_job_usage_map.get(name, {}),
         resource_type=resource_type,
+        capabilities=["verification"] if can_verify else [],
     )
 
 

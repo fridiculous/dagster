@@ -1,8 +1,11 @@
 from typing import Optional, Sequence, Union
 
 import dagster._check as check
+from dagster_graphql.schema.resources import GrapheneResourceVerificationResult
 import graphene
+from dagster._config.structured_config.resource_verification import VerificationStatus
 from dagster._core.definitions.events import AssetKey
+from dagster._core.definitions.selector import ResourceSelector
 from dagster._core.nux import get_has_seen_nux, set_nux_seen
 from dagster._core.workspace.permissions import Permissions
 
@@ -16,6 +19,9 @@ from dagster_graphql.implementation.execution.launch_execution import (
     launch_pipeline_execution,
     launch_pipeline_reexecution,
     launch_reexecution_from_parent_run,
+)
+from dagster_graphql.implementation.resource_verification import (
+    resource_verification,
 )
 
 from ...implementation.execution import (
@@ -59,6 +65,7 @@ from ..inputs import (
     GrapheneLaunchBackfillParams,
     GrapheneReexecutionParams,
     GrapheneRepositorySelector,
+    GrapheneResourceSelector,
 )
 from ..partition_sets import GrapheneAddDynamicPartitionResult
 from ..pipelines.pipeline import GrapheneRun
@@ -694,6 +701,38 @@ class GrapheneSetNuxSeenMutation(graphene.Mutation):
         return get_has_seen_nux()
 
 
+class GrapheneLaunchResourceVerificationMutationResult(graphene.Union):
+    class Meta:
+        types = (
+            GrapheneRepositoryLocationNotFound,
+            GrapheneUnauthorizedError,
+            GraphenePythonError,
+            GrapheneResourceVerificationResult,
+        )
+        name = "LaunchResourceVerificationMutationResult"
+
+
+class GrapheneLaunchResourceVerificationMutation(graphene.Mutation):
+    Output = graphene.NonNull(GrapheneLaunchResourceVerificationMutationResult)
+
+    class Meta:
+        name = "LaunchResourceVerificationMutation"
+
+    class Arguments:
+        resourceSelector = graphene.NonNull(GrapheneResourceSelector)
+
+    @capture_error
+    def mutate(
+        self, graphene_info: ResolveInfo, resourceSelector: GrapheneResourceSelector
+    ) -> bool:
+        res = resource_verification(
+            graphene_info, ResourceSelector.from_graphql_input(resourceSelector)
+        )
+        return GrapheneResourceVerificationResult(
+            status=res.status, message=res.message or ""
+        )
+
+
 class GrapheneDagitMutation(graphene.ObjectType):
     """The root for all mutations to modify data in your Dagster instance."""
 
@@ -725,3 +764,4 @@ class GrapheneDagitMutation(graphene.ObjectType):
     log_telemetry = GrapheneLogTelemetryMutation.Field()
     set_nux_seen = GrapheneSetNuxSeenMutation.Field()
     add_dynamic_partition = GrapheneAddDynamicPartitionMutation.Field()
+    launch_resource_verification = GrapheneLaunchResourceVerificationMutation.Field()
