@@ -22,6 +22,7 @@ from dagster._annotations import PublicAttr, public
 from dagster._core.definitions.data_version import DataVersion
 from dagster._core.storage.tags import MULTIDIMENSIONAL_PARTITION_PREFIX, SYSTEM_TAG_PREFIX
 from dagster._serdes import whitelist_for_serdes
+from dagster._serdes.serdes import NamedTupleSerializer
 from dagster._utils.backcompat import experimental_class_param_warning
 
 from .metadata import (
@@ -162,7 +163,7 @@ class AssetKey(NamedTuple("_AssetKey", [("path", PublicAttr[Sequence[str]])])):
         if isinstance(arg, AssetKey):
             return check.inst_param(arg, "arg", AssetKey)
         elif isinstance(arg, str):
-            return AssetKey([arg])
+            return AssetKey.from_user_string(arg)
         elif isinstance(arg, list):
             check.list_param(arg, "arg", of_type=str)
             return AssetKey(arg)
@@ -421,7 +422,23 @@ class AssetObservation(
         return " ".join(self.asset_key.path)
 
 
-@whitelist_for_serdes(old_storage_names={"Materialization"})
+UNDEFINED_ASSET_KEY = AssetKey(["undefined"])
+
+
+class AssetMaterializationSerializer(NamedTupleSerializer):
+    # There are old `Materialization` objects in storage. We set the default value for asset key to be
+    # `AssetKey(["undefined"])` to ensure that we can load these objects, without needing to allow for
+    # the construction of new `AssetMaterialization` objects with no defined AssetKey.
+    def before_unpack(self, **raw_dict: Any) -> Any:
+        # cover both the case where "asset_key" is not present at all and where it is None
+        if raw_dict.get("asset_key") is None:
+            raw_dict["asset_key"] = {"__class__": "AssetKey", "path": ["undefined"]}
+        return raw_dict
+
+
+@whitelist_for_serdes(
+    old_storage_names={"Materialization"}, serializer=AssetMaterializationSerializer
+)
 class AssetMaterialization(
     NamedTuple(
         "_AssetMaterialization",
@@ -472,14 +489,7 @@ class AssetMaterialization(
     ):
         from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionKey
 
-        if isinstance(asset_key, AssetKey):
-            check.inst_param(asset_key, "asset_key", AssetKey)
-        elif isinstance(asset_key, str):
-            asset_key = AssetKey(parse_asset_key_string(asset_key))
-        elif isinstance(asset_key, Sequence):
-            check.sequence_param(asset_key, "asset_key", of_type=str)
-            asset_key = AssetKey(asset_key)
-
+        asset_key = AssetKey.from_coerceable(asset_key)
         check.opt_mapping_param(tags, "tags", key_type=str, value_type=str)
         invalid_tags = [tag for tag in tags or {} if not tag.startswith(SYSTEM_TAG_PREFIX)]
         if len(invalid_tags) > 0:
