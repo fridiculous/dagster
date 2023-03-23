@@ -13,6 +13,8 @@ from .assets import AssetsDefinition
 from .source_asset import SourceAsset
 
 if TYPE_CHECKING:
+    from dagster._core.definitions.asset_selection import CoercibleToAssetSelection
+
     from ..execution.execute_in_process_result import ExecuteInProcessResult
 
 
@@ -24,6 +26,7 @@ def materialize(
     partition_key: Optional[str] = None,
     raise_on_error: bool = True,
     tags: Optional[Mapping[str, str]] = None,
+    selection: Optional["CoercibleToAssetSelection"] = None,
 ) -> "ExecuteInProcessResult":
     """Executes a single-threaded, in-process run which materializes provided assets.
 
@@ -41,6 +44,17 @@ def materialize(
             The string partition key that specifies the run config to execute. Can only be used
             to select run config for assets with partitioned config.
         tags (Optional[Mapping[str, str]]): Tags for the run.
+        selection (Optional[Union[str, Sequence[str], Sequence[AssetKey], Sequence[Union[AssetsDefinition, SourceAsset]], AssetSelection]]):
+            A sub-selection of assets to materialize.
+
+            The selected assets must all be included in the assets that are passed to the assets
+            argument.
+
+            If not provided, then all assets will be materialized.
+
+            The string "my_asset*" selects my_asset and all downstream assets within the code
+            location. A list of strings represents the union of all assets selected by strings
+            within the list.
 
     Returns:
         ExecuteInProcessResult: The result of the execution.
@@ -59,7 +73,11 @@ def materialize(
 
     JOB_NAME = "__ephemeral_asset_job__"
 
-    defs = Definitions(jobs=[define_asset_job(name=JOB_NAME)], assets=assets, resources=resources)
+    defs = Definitions(
+        jobs=[define_asset_job(name=JOB_NAME, selection=selection)],
+        assets=assets,
+        resources=resources,
+    )
     return check.not_none(
         defs.get_job_def(JOB_NAME),
         "This should always return a job",
@@ -80,6 +98,7 @@ def materialize_to_memory(
     partition_key: Optional[str] = None,
     raise_on_error: bool = True,
     tags: Optional[Mapping[str, str]] = None,
+    selection: Optional["CoercibleToAssetSelection"] = None,
 ) -> "ExecuteInProcessResult":
     """Executes a single-threaded, in-process run which materializes provided assets in memory.
 
@@ -99,6 +118,17 @@ def materialize_to_memory(
             The string partition key that specifies the run config to execute. Can only be used
             to select run config for assets with partitioned config.
         tags (Optional[Mapping[str, str]]): Tags for the run.
+        selection (Optional[Union[str, Sequence[str], Sequence[AssetKey], Sequence[Union[AssetsDefinition, SourceAsset]], AssetSelection]]):
+            A sub-selection of assets to materialize.
+
+            The selected assets must all be included in the assets that are passed to the assets
+            argument.
+
+            If not provided, then all assets will be materialized.
+
+            The string "my_asset*" selects my_asset and all downstream assets within the code
+            location. A list of strings represents the union of all assets selected by strings
+            within the list.
 
     Returns:
         ExecuteInProcessResult: The result of the execution.
@@ -132,6 +162,7 @@ def materialize_to_memory(
         partition_key=partition_key,
         raise_on_error=raise_on_error,
         tags=tags,
+        selection=selection,
     )
 
 
