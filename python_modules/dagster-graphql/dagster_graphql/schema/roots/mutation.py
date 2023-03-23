@@ -1,9 +1,7 @@
 from typing import Optional, Sequence, Union
 
 import dagster._check as check
-from dagster_graphql.schema.resources import GrapheneResourceVerificationResult
 import graphene
-from dagster._config.structured_config.resource_verification import VerificationStatus
 from dagster._core.definitions.events import AssetKey
 from dagster._core.definitions.selector import ResourceSelector
 from dagster._core.nux import get_has_seen_nux, set_nux_seen
@@ -23,6 +21,7 @@ from dagster_graphql.implementation.execution.launch_execution import (
 from dagster_graphql.implementation.resource_verification import (
     resource_verification,
 )
+from dagster_graphql.schema.resources import GrapheneResourceVerificationResult
 
 from ...implementation.execution import (
     delete_pipeline_run,
@@ -728,9 +727,7 @@ class GrapheneLaunchResourceVerificationMutation(graphene.Mutation):
         res = resource_verification(
             graphene_info, ResourceSelector.from_graphql_input(resourceSelector)
         )
-        return GrapheneResourceVerificationResult(
-            status=res.status, message=res.message or ""
-        )
+        return GrapheneResourceVerificationResult(status=res.status, message=res.message or "")
 
 
 class GrapheneDagitMutation(graphene.ObjectType):
