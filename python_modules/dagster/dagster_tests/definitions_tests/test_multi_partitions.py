@@ -16,7 +16,8 @@ from dagster import (
     repository,
 )
 from dagster._core.definitions.multi_dimensional_partitions import MultiPartitionsDefinition
-from dagster._core.errors import DagsterInvalidDefinitionError
+from dagster._core.definitions.time_window_partitions import TimeWindow
+from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvariantViolationError
 from dagster._core.storage.tags import get_multidimensional_partition_tag
 from dagster._core.test_utils import instance_for_test
 
@@ -453,4 +454,58 @@ def test_invalid_dynamic_partitions_def_in_multipartitioned():
                 "static": StaticPartitionsDefinition(["a", "b", "c"]),
                 "dynamic": DynamicPartitionsDefinition(lambda x: ["1", "2", "3"]),
             }
+        )
+
+
+def test_context_partition_time_window():
+    partitions_def = MultiPartitionsDefinition(
+        {
+            "date": DailyPartitionsDefinition(start_date="2020-01-01"),
+            "static": StaticPartitionsDefinition(["a", "b"]),
+        }
+    )
+
+    time_window = TimeWindow(
+        start=datetime(year=2020, month=1, day=1),
+        end=datetime(year=2020, month=1, day=2),
+    )
+
+    @asset(partitions_def=partitions_def)
+    def my_asset(context):
+        assert context.partition_time_window == time_window
+        assert context.asset_partitions_time_window_for_output() == time_window
+        return 1
+
+    multipartitioned_job = define_asset_job(
+        "my_job", [my_asset], partitions_def=partitions_def
+    ).resolve([my_asset], [])
+    multipartitioned_job.execute_in_process(
+        partition_key=MultiPartitionKey({"date": "2020-01-01", "static": "a"})
+    )
+
+
+def test_context_invalid_partition_time_window():
+    partitions_def = MultiPartitionsDefinition(
+        {
+            "static2": StaticPartitionsDefinition(["a", "b"]),
+            "static": StaticPartitionsDefinition(["a", "b"]),
+        }
+    )
+
+    @asset(partitions_def=partitions_def)
+    def my_asset(context):
+        context.partition_time_window
+
+    multipartitioned_job = define_asset_job(
+        "my_job", [my_asset], partitions_def=partitions_def
+    ).resolve([my_asset], [])
+    with pytest.raises(
+        DagsterInvariantViolationError,
+        match=(
+            "Expected a TimeWindowPartitionsDefinition or MultiPartitionsDefinition with a single"
+            " time dimension"
+        ),
+    ):
+        multipartitioned_job.execute_in_process(
+            partition_key=MultiPartitionKey({"static2": "b", "static": "a"})
         )
